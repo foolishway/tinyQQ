@@ -17,7 +17,7 @@ var (
 func main() {
 	//fmt.Printf("请输入用户名：")
 	//fmt.Scan(&loginName)
-	conn, err := net.Dial("tcp", ":8888")
+	conn, err := net.Dial("tcp", "10.11.17.37:8888")
 	defer conn.Close()
 
 	if err != nil {

@@ -31,7 +31,7 @@ const (
 	remindMsg4 string = "未找到您输入的聊天对象，请重新输入："
 )
 func main() {
-	l, err := net.Listen("tcp", ":8888")
+	l, err := net.Listen("tcp", "10.11.17.37:8888")
 	if err != nil {
 		log.Println("error listen:", err)
 		return
@@ -84,7 +84,9 @@ func handleConn(conn net.Conn) {
 		//login, record the user
 		if lUser == "" {
 			fmt.Printf("%s已上线~\n", readContent)
-			if _, ok := userMap[string(lUser)]; !ok {
+			fmt.Printf("userMap:%q", userMap)
+			if _, ok := userMap[readContent]; !ok {
+				fmt.Println("%T", ok)
 				//user address eg:127.0.0.1:8000
 				lUser = readContent
 				addr = conn.RemoteAddr().String()
@@ -93,9 +95,11 @@ func handleConn(conn net.Conn) {
 				continue
 			} else {
 				//indicate whether login user is waiting for the chatter
+				fmt.Println("123")
 				var isWaiting bool
 				for i := 0; i < len(userMap[lUser]); i++ {
 					if userMap[lUser][i].chatter == "" {
+						fmt.Println("7809")
 						util.Write(conn,fmt.Sprintf("该用户存在已打开的且未选择聊天对象的终端~\n%s", remindMsg1))
 						isWaiting = true
 						continue loop
@@ -161,10 +165,18 @@ func getConnByUser(tUser, lUser string) (conn net.Conn) {
 	return
 }
 
+//tell user that who is waiting to connect now
 func sendLoginUsersToLUser(lUser string, conn net.Conn) {
 	var loginUsers []string
-	for k, _ := range userMap {
-		if lUser != k {
+	for k, us := range userMap {
+		var isWaiting bool
+		for _, v := range us {
+			if v.chatter == "" && lUser != k {
+				isWaiting = true
+				break
+			}
+		}
+		if isWaiting {
 			loginUsers = append(loginUsers, k)
 		}
 	}
