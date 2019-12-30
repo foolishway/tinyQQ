@@ -13,6 +13,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"errors"
 )
 
 type LoginUser struct {
@@ -26,6 +27,8 @@ var userMap = make(map[string][]LoginUser)
 const (
 	remindMsg1 string = "请输入用户名："
 	remindMsg2 string = "请输入聊天对象："
+	remindMsg3 string = "系统消息：%s找您聊天，您已经和TA建立了连接，可以畅聊了~"
+	remindMsg4 string = "未找到您输入的聊天对象，请重新输入："
 )
 func main() {
 	l, err := net.Listen("tcp", ":8888")
@@ -89,6 +92,7 @@ func handleConn(conn net.Conn) {
 				sendLoginUsersToLUser(lUser, conn)
 				continue
 			} else {
+				//indicate whether login user is waiting for the chatter
 				var isWaiting bool
 				for i := 0; i < len(userMap[lUser]); i++ {
 					if userMap[lUser][i].chatter == "" {
@@ -120,20 +124,25 @@ func transportMessage(lUser, addr, content string, conn net.Conn) {
 					if lUser == content {
 						msg := fmt.Sprintf("系统消息：不能和自己聊天~\n%s", remindMsg2)
 						util.Write(conn, msg)
-						break
+						return
 					} else {
 						//bind chatter
+						err := forceConnection(lUser, content)
+						if err != nil {
+							util.Write(conn, err.Error())
+							return
+						}
 						u[i].chatter = content
 						msg := fmt.Sprintf("系统消息：连接已建立，和%s快乐的聊天吧~", content)
 						util.Write(conn, msg)
-						break
+						return
 					}
 				} else {
 					//transport message
 					chatter := u[i].chatter
 					chatterConn := getConnByUser(chatter, lUser)
 					util.Write(chatterConn, fmt.Sprintf("%s：%s",lUser, content))
-					break
+					return
 				}
 			}
 		}
@@ -176,15 +185,11 @@ func offLine(lUser, addr string) {
 }
 
 func closeConn(lUser, addr string) {
-		fmt.Println("closeConn~")
 		if _, ok := userMap[lUser]; ok {
 			if len(userMap[lUser]) <= 1 {
 				//close the connection
 				userMap[lUser][0].Conn.Close()
 				delete(userMap, lUser)
-				fmt.Println("closeConn2~")
-
-				fmt.Printf("userMap:%q", userMap)
 				return
 			}
 
@@ -198,12 +203,10 @@ func closeConn(lUser, addr string) {
 				}
 			}
 		}
-		fmt.Printf("userMap:%q", userMap)
-
 }
 
+//tell the guy that the opposite guy has leaved and he can connect to another guy
 func reportTUserOffLine(lUser, addr string)  {
-	fmt.Println("reportTUserOffLine", addr)
 	var chatter string
 	var conn net.Conn
 	if _, ok := userMap[lUser]; ok {
@@ -233,4 +236,20 @@ func reportTUserOffLine(lUser, addr string)  {
 
 		util.Write(conn, msg)
 	}
+}
+
+//when a login user connect to a waiting guy, then force buiding the connection
+func forceConnection(lUser, chatter string) (err error)  {
+	//var isExistWaiting bool
+	if us, ok := userMap[chatter]; ok {
+		for i := 0; i < len(us); i++ {
+			if us[i].chatter == "" {
+				us[i].chatter = lUser
+				util.Write(us[i].Conn, fmt.Sprintf(remindMsg3, lUser))
+				//isExistWaiting = true
+				return nil
+			}
+		}
+	}
+	return errors.New(remindMsg4)
 }
