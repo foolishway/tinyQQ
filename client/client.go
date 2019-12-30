@@ -15,8 +15,8 @@ var (
 )
 
 func main() {
-	fmt.Printf("请输入用户名：")
-	fmt.Scan(&loginName)
+	//fmt.Printf("请输入用户名：")
+	//fmt.Scan(&loginName)
 	conn, err := net.Dial("tcp", ":8888")
 	defer conn.Close()
 
@@ -30,7 +30,7 @@ func main() {
 	go readMessage(conn, &wg, closeSignal)
 
 	//_, err = conn.Write([]byte(loginName))
-	_, err = util.Write(conn, loginName)
+	//_, err = util.Write(conn, loginName)
 	if err != nil {
 		log.Printf("login error: %s", err)
 		return

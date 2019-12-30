@@ -24,7 +24,8 @@ type LoginUser struct {
 var userMap = make(map[string][]LoginUser)
 
 const (
-	remindMsg string = "请输入聊天对象："
+	remindMsg1 string = "请输入用户名："
+	remindMsg2 string = "请输入聊天对象："
 )
 func main() {
 	l, err := net.Listen("tcp", ":8888")
@@ -50,6 +51,10 @@ func handleConn(conn net.Conn) {
 	var (
 		lUser, addr string
 	)
+	if len(lUser) == 0 {
+		util.Write(conn, remindMsg1)
+	}
+	loop:
 	for {
 		//fmt.Printf("%s read from %q", lUser, conn)
 		// read from the connection
@@ -76,19 +81,27 @@ func handleConn(conn net.Conn) {
 		//login, record the user
 		if lUser == "" {
 			fmt.Printf("%s已上线~\n", readContent)
-			lUser = readContent
 			if _, ok := userMap[string(lUser)]; !ok {
 				//user address eg:127.0.0.1:8000
+				lUser = readContent
 				addr = conn.RemoteAddr().String()
 				userMap[lUser] = []LoginUser{LoginUser{Conn: conn, Addr: addr}}
 				sendLoginUsersToLUser(lUser, conn)
 				continue
 			} else {
+				var isWaiting bool
 				for i := 0; i < len(userMap[lUser]); i++ {
 					if userMap[lUser][i].chatter == "" {
-						util.Write(conn,"该用户存在已打开的且未选择聊天对象的终端~")
-						return
+						util.Write(conn,fmt.Sprintf("该用户存在已打开的且未选择聊天对象的终端~\n%s", remindMsg1))
+						isWaiting = true
+						continue loop
 					}
+				}
+				if !isWaiting {
+					lUser = readContent
+					userMap[lUser] = append(userMap[lUser], LoginUser{Conn: conn, Addr: addr})
+					util.Write(conn, remindMsg2)
+					continue
 				}
 			}
 		}
@@ -105,7 +118,7 @@ func transportMessage(lUser, addr, content string, conn net.Conn) {
 				//unbind chatter
 				if u[i].chatter == "" {
 					if lUser == content {
-						msg := fmt.Sprintf("系统消息：不能和自己聊天~\n%s", remindMsg)
+						msg := fmt.Sprintf("系统消息：不能和自己聊天~\n%s", remindMsg2)
 						util.Write(conn, msg)
 						break
 					} else {
@@ -148,10 +161,10 @@ func sendLoginUsersToLUser(lUser string, conn net.Conn) {
 	}
 	var msg string = "暂无好友~"
 	if len(loginUsers) > 1 {
-		msg = fmt.Sprintf("当前在线好友：%s%c%s", strings.Join(loginUsers, ","), '\n', remindMsg)
+		msg = fmt.Sprintf("当前在线好友：%s%c%s", strings.Join(loginUsers, ","), '\n', remindMsg2)
 	}
 	if len(loginUsers) == 1 {
-		msg = fmt.Sprintf("当前在线好友：%s%c%s", loginUsers[0],'\n', remindMsg)
+		msg = fmt.Sprintf("当前在线好友：%s%c%s", loginUsers[0],'\n', remindMsg2)
 	}
 	util.Write(conn, msg)
 }
@@ -200,14 +213,6 @@ func reportTUserOffLine(lUser, addr string)  {
 				break
 			}
 		}
-		//for i := 0; i < len(userMap[tUser]); i++ {
-		//	if userMap[tUser][i].chatter == lUser {
-		//		userMap[tUser][i].chatter = ""
-		//		msg := fmt.Sprintf("%s已下线\n%s", lUser, remindMsg)
-		//
-		//		util.Write(userMap[tUser][i].Conn, msg)
-		//	}
-		//}
 	}
 
 	fmt.Println("chatter:", chatter)
@@ -215,6 +220,7 @@ func reportTUserOffLine(lUser, addr string)  {
 		if _, ok := userMap[chatter]; ok {
 			for i := 0; i < len(userMap[chatter]); i++ {
 				if userMap[chatter][i].chatter == lUser {
+					userMap[chatter][i].chatter = ""
 					conn = userMap[chatter][i].Conn
 					break
 				}
@@ -223,7 +229,7 @@ func reportTUserOffLine(lUser, addr string)  {
 	}
 
 	if conn != nil {
-		msg := fmt.Sprintf("%s已下线\n%s", lUser, remindMsg)
+		msg := fmt.Sprintf("%s已下线\n%s", lUser, remindMsg2)
 
 		util.Write(conn, msg)
 	}
