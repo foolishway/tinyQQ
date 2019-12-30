@@ -10,16 +10,16 @@ import (
 
 	"github.com/tinyQQ/util"
 	//"io"
+	"errors"
 	"log"
 	"net"
 	"strings"
-	"errors"
 )
 
 type LoginUser struct {
-	Conn        net.Conn
+	Conn    net.Conn
 	chatter string
-	Addr string
+	Addr    string
 }
 
 var userMap = make(map[string][]LoginUser)
@@ -30,8 +30,9 @@ const (
 	remindMsg3 string = "系统消息：%s找您聊天，您已经和TA建立了连接，可以畅聊了~"
 	remindMsg4 string = "未找到您输入的聊天对象，请重新输入："
 )
+
 func main() {
-	l, err := net.Listen("tcp", "10.11.17.37:8888")
+	l, err := net.Listen("tcp", ":8888")
 	if err != nil {
 		log.Println("error listen:", err)
 		return
@@ -57,7 +58,7 @@ func handleConn(conn net.Conn) {
 	if len(lUser) == 0 {
 		util.Write(conn, remindMsg1)
 	}
-	loop:
+loop:
 	for {
 		//fmt.Printf("%s read from %q", lUser, conn)
 		// read from the connection
@@ -84,9 +85,7 @@ func handleConn(conn net.Conn) {
 		//login, record the user
 		if lUser == "" {
 			fmt.Printf("%s已上线~\n", readContent)
-			fmt.Printf("userMap:%q", userMap)
 			if _, ok := userMap[readContent]; !ok {
-				fmt.Println("%T", ok)
 				//user address eg:127.0.0.1:8000
 				lUser = readContent
 				addr = conn.RemoteAddr().String()
@@ -95,12 +94,10 @@ func handleConn(conn net.Conn) {
 				continue
 			} else {
 				//indicate whether login user is waiting for the chatter
-				fmt.Println("123")
 				var isWaiting bool
-				for i := 0; i < len(userMap[lUser]); i++ {
-					if userMap[lUser][i].chatter == "" {
-						fmt.Println("7809")
-						util.Write(conn,fmt.Sprintf("该用户存在已打开的且未选择聊天对象的终端~\n%s", remindMsg1))
+				for i := 0; i < len(userMap[readContent]); i++ {
+					if userMap[readContent][i].chatter == "" {
+						util.Write(conn, fmt.Sprintf("该用户存在已打开的且未选择聊天对象的终端~\n%s", remindMsg1))
 						isWaiting = true
 						continue loop
 					}
@@ -145,7 +142,7 @@ func transportMessage(lUser, addr, content string, conn net.Conn) {
 					//transport message
 					chatter := u[i].chatter
 					chatterConn := getConnByUser(chatter, lUser)
-					util.Write(chatterConn, fmt.Sprintf("%s：%s",lUser, content))
+					util.Write(chatterConn, fmt.Sprintf("%s：%s", lUser, content))
 					return
 				}
 			}
@@ -185,7 +182,7 @@ func sendLoginUsersToLUser(lUser string, conn net.Conn) {
 		msg = fmt.Sprintf("当前在线好友：%s%c%s", strings.Join(loginUsers, ","), '\n', remindMsg2)
 	}
 	if len(loginUsers) == 1 {
-		msg = fmt.Sprintf("当前在线好友：%s%c%s", loginUsers[0],'\n', remindMsg2)
+		msg = fmt.Sprintf("当前在线好友：%s%c%s", loginUsers[0], '\n', remindMsg2)
 	}
 	util.Write(conn, msg)
 }
@@ -197,28 +194,27 @@ func offLine(lUser, addr string) {
 }
 
 func closeConn(lUser, addr string) {
-		if _, ok := userMap[lUser]; ok {
-			if len(userMap[lUser]) <= 1 {
-				//close the connection
-				userMap[lUser][0].Conn.Close()
-				delete(userMap, lUser)
-				return
-			}
+	if _, ok := userMap[lUser]; ok {
+		if len(userMap[lUser]) <= 1 {
+			//close the connection
+			userMap[lUser][0].Conn.Close()
+			delete(userMap, lUser)
+			return
+		}
 
-
-			for i := 0; i < len(userMap[lUser]); i++ {
-				if userMap[lUser][i].Addr == addr {
-					// delete(userMap[lUser][i])
-					userMap[lUser][i].Conn.Close()
-					userMap[lUser] = append(userMap[lUser][:i], userMap[lUser][i+1:]...)
-					break
-				}
+		for i := 0; i < len(userMap[lUser]); i++ {
+			if userMap[lUser][i].Addr == addr {
+				// delete(userMap[lUser][i])
+				userMap[lUser][i].Conn.Close()
+				userMap[lUser] = append(userMap[lUser][:i], userMap[lUser][i+1:]...)
+				break
 			}
 		}
+	}
 }
 
 //tell the guy that the opposite guy has leaved and he can connect to another guy
-func reportTUserOffLine(lUser, addr string)  {
+func reportTUserOffLine(lUser, addr string) {
 	var chatter string
 	var conn net.Conn
 	if _, ok := userMap[lUser]; ok {
@@ -251,7 +247,7 @@ func reportTUserOffLine(lUser, addr string)  {
 }
 
 //when a login user connect to a waiting guy, then force buiding the connection
-func forceConnection(lUser, chatter string) (err error)  {
+func forceConnection(lUser, chatter string) (err error) {
 	//var isExistWaiting bool
 	if us, ok := userMap[chatter]; ok {
 		for i := 0; i < len(us); i++ {
