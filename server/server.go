@@ -16,13 +16,13 @@ import (
 	"strings"
 )
 
-type LoginUser struct {
+type loginUser struct {
 	Conn    net.Conn
 	chatter string
 	Addr    string
 }
 
-var userMap = make(map[string][]LoginUser)
+var userMap = make(map[string][]loginUser)
 
 const (
 	remindMsg1 string = "请输入用户名："
@@ -89,7 +89,7 @@ loop:
 				//user address eg:127.0.0.1:8000
 				lUser = readContent
 				addr = conn.RemoteAddr().String()
-				userMap[lUser] = []LoginUser{LoginUser{Conn: conn, Addr: addr}}
+				userMap[lUser] = []loginUser{loginUser{Conn: conn, Addr: addr}}
 				sendLoginUsersToLUser(lUser, conn)
 				continue
 			} else {
@@ -104,7 +104,7 @@ loop:
 				}
 				if !isWaiting {
 					lUser = readContent
-					userMap[lUser] = append(userMap[lUser], LoginUser{Conn: conn, Addr: addr})
+					userMap[lUser] = append(userMap[lUser], loginUser{Conn: conn, Addr: addr})
 					util.Write(conn, remindMsg2)
 					continue
 				}
