@@ -75,7 +75,7 @@ loop:
 			//}
 			////client closed
 			if err == io.EOF {
-				fmt.Printf("%s(%s)已下线~", lUser, addr)
+				fmt.Printf("%s(%s)已下线~\n", lUser, addr)
 				addr := conn.RemoteAddr().String()
 				offLine(lUser, addr)
 				return
@@ -85,10 +85,10 @@ loop:
 		//login, record the user
 		if lUser == "" {
 			fmt.Printf("%s已上线~\n", readContent)
+			addr = conn.RemoteAddr().String()
 			if _, ok := userMap[readContent]; !ok {
 				//user address eg:127.0.0.1:8000
 				lUser = readContent
-				addr = conn.RemoteAddr().String()
 				userMap[lUser] = []loginUser{loginUser{Conn: conn, Addr: addr}}
 				sendLoginUsersToLUser(lUser, conn)
 				continue
@@ -226,7 +226,6 @@ func reportTUserOffLine(lUser, addr string) {
 		}
 	}
 
-	fmt.Println("chatter:", chatter)
 	if chatter != "" {
 		if _, ok := userMap[chatter]; ok {
 			for i := 0; i < len(userMap[chatter]); i++ {
