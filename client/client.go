@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
@@ -69,21 +70,23 @@ func readMessage(conn net.Conn, wg *sync.WaitGroup, closeSignal chan struct{}) {
 }
 
 func receiveContentFromStdin(conn net.Conn, closeSignal chan struct{}) {
-loop:
-	for {
-		select {
-		case <-closeSignal:
-			break loop
-		default:
+//loop:
+//	for {
+//		select {
+//		case <-closeSignal:
+//			break loop
+//		default:
+//
+//		}
+//		buf := make([]byte, 1024)
 
+		scanner := bufio.NewScanner(os.Stdin)
+
+		for scanner.Scan() {
+			content := scanner.Text()
+			util.Write(conn, content)
 		}
-		buf := make([]byte, 1024)
-
-		n, _ := os.Stdin.Read(buf)
-
-		//if toName == "" {
-		//	toName = string(buf[:n])
-		//}
-		util.Write(conn, string(buf[:n]))
-	}
+		if err := scanner.Err(); err != nil {
+			log.Println("Receive from stdin error:", err)
+		}
 }

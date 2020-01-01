@@ -23,7 +23,7 @@ func Read(conn net.Conn) (content string, err error) {
 	//for {
 	//	ba, isPrefix, err := reader.ReadLine()
 	//	if err != nil {
-	//		//if err == io.EOF {
+			//if err == io.EOF {
 	//		//	fmt.Println("util read error (EOF): %s", err)
 	//		//	break
 	//		//}
