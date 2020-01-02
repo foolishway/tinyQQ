@@ -1,6 +1,6 @@
 #! /bin/bash
 
 cd ./client
-go build
+go install
 cd ../server
-go build
+go install

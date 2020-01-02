@@ -17,9 +17,10 @@ import (
 )
 
 type loginUser struct {
+	Addr    string
 	Conn    net.Conn
 	chatter string
-	Addr    string
+	ChatterAddr string
 }
 
 var userMap = make(map[string][]loginUser)
@@ -29,6 +30,10 @@ const (
 	remindMsg2 string = "请输入聊天对象："
 	remindMsg3 string = "系统消息：%s找您聊天，您已经和TA建立了连接，可以畅聊了~"
 	remindMsg4 string = "未找到您输入的聊天对象，请重新输入："
+	remindMsg5 string = "系统消息：连接已建立，和%s快乐的聊天吧~"
+	remindMsg6 string = "系统消息：不能和自己聊天~\n%s"
+	remindMsg7 string = "该用户存在已打开的且未选择聊天对象的终端~\n%s"
+
 )
 
 func main() {
@@ -86,18 +91,18 @@ loop:
 		if lUser == "" {
 			fmt.Printf("%s已上线~\n", readContent)
 			addr = conn.RemoteAddr().String()
-			if _, ok := userMap[readContent]; !ok {
-				//user address eg:127.0.0.1:8000
-				lUser = readContent
-				userMap[lUser] = []loginUser{loginUser{Conn: conn, Addr: addr}}
-				sendLoginUsersToLUser(lUser, conn)
-				continue
-			} else {
+			//if _, ok := userMap[readContent]; !ok {
+			//	//user address eg:127.0.0.1:8000
+			//	lUser = readContent
+			//	userMap[lUser] = []loginUser{loginUser{Conn: conn, Addr: addr}}
+			//	sendLoginUsersToLUser(lUser, conn)
+			//	continue
+			//} else {
 				//indicate whether login user is waiting for the chatter
 				var isWaiting bool
 				for i := 0; i < len(userMap[readContent]); i++ {
 					if userMap[readContent][i].chatter == "" {
-						util.Write(conn, fmt.Sprintf("该用户存在已打开的且未选择聊天对象的终端~\n%s", remindMsg1))
+						util.Write(conn, fmt.Sprintf(remindMsg7, remindMsg1))
 						isWaiting = true
 						continue loop
 					}
@@ -105,10 +110,10 @@ loop:
 				if !isWaiting {
 					lUser = readContent
 					userMap[lUser] = append(userMap[lUser], loginUser{Conn: conn, Addr: addr})
-					util.Write(conn, remindMsg2)
+					sendLoginUsersToLUser(lUser, conn)
 					continue
 				}
-			}
+			//}
 		}
 
 		transportMessage(lUser, addr, readContent, conn)
@@ -123,25 +128,29 @@ func transportMessage(lUser, addr, content string, conn net.Conn) {
 				//unbind chatter
 				if u[i].chatter == "" {
 					if lUser == content {
-						msg := fmt.Sprintf("系统消息：不能和自己聊天~\n%s", remindMsg2)
+						msg := fmt.Sprintf(remindMsg6, remindMsg2)
 						util.Write(conn, msg)
 						return
 					} else {
+						tUser := content
 						//bind chatter
-						err := forceConnection(lUser, content)
+						chatterAddr, err := forceConnection(lUser, tUser, addr)
 						if err != nil {
 							util.Write(conn, err.Error())
 							return
 						}
+						//chatterAddr := getAddrByUser(tUser)
 						u[i].chatter = content
-						msg := fmt.Sprintf("系统消息：连接已建立，和%s快乐的聊天吧~", content)
+						u[i].ChatterAddr = chatterAddr
+						msg := fmt.Sprintf(remindMsg5, content)
 						util.Write(conn, msg)
 						return
 					}
 				} else {
 					//transport message
 					chatter := u[i].chatter
-					chatterConn := getConnByUser(chatter, lUser)
+					chatterAddr := u[i].ChatterAddr
+					chatterConn := getConnByUser(chatter, chatterAddr)
 					util.Write(chatterConn, fmt.Sprintf("%s：%s", lUser, content))
 					return
 				}
@@ -149,13 +158,13 @@ func transportMessage(lUser, addr, content string, conn net.Conn) {
 		}
 	}
 }
-
-func getConnByUser(tUser, lUser string) (conn net.Conn) {
-	if _, ok := userMap[tUser]; ok {
-		for i := 0; i < len(userMap[tUser]); i++ {
-			if userMap[tUser][i].chatter == lUser || userMap[tUser][i].chatter == "" {
+func getConnByUser(chatter, chatterAddr string) (conn net.Conn) {
+	if _, ok := userMap[chatter]; ok {
+		for i := 0; i < len(userMap[chatter]); i++ {
+			//if (userMap[tUser][i].chatter == lUser && userMap[tUser][i].ChatterAddr == chatterAddr)  || userMap[tUser][i].chatter == "" {
+			if userMap[chatter][i].Addr == chatterAddr {
 				//fmt.Println("find conn~")
-				conn = userMap[tUser][i].Conn
+				conn = userMap[chatter][i].Conn
 			}
 		}
 	}
@@ -246,17 +255,19 @@ func reportTUserOffLine(lUser, addr string) {
 }
 
 //when a login user connect to a waiting guy, then force buiding the connection
-func forceConnection(lUser, chatter string) (err error) {
+func forceConnection(lUser, chatter, addr string) (chatterAddr string, err error) {
 	//var isExistWaiting bool
 	if us, ok := userMap[chatter]; ok {
 		for i := 0; i < len(us); i++ {
 			if us[i].chatter == "" {
+				chatterAddr = us[i].Addr
 				us[i].chatter = lUser
+				us[i].ChatterAddr = addr
 				util.Write(us[i].Conn, fmt.Sprintf(remindMsg3, lUser))
 				//isExistWaiting = true
-				return nil
+				return
 			}
 		}
 	}
-	return errors.New(remindMsg4)
+	return "", errors.New(remindMsg4)
 }
